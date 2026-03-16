@@ -29,17 +29,24 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Patch expo-router context to use static path
+        run: |
+          CTX="node_modules/expo-router/_ctx.android.tsx"
+          echo "--- Before patch ---"
+          cat "$CTX"
+          sed -i "s|process.env.EXPO_ROUTER_APP_ROOT|'../../app'|g" "$CTX"
+          echo "--- After patch ---"
+          cat "$CTX"
+
       - name: Expo prebuild
         run: npx expo prebuild --platform android --clean
 
       - name: Pin Gradle to 7.6.3
-        run: printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > android/gradle/wrapper/gradle-wrapper.properties && cat android/gradle/wrapper/gradle-wrapper.properties
+        run: printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > android/gradle/wrapper/gradle-wrapper.properties && cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Bundle JavaScript into APK
         run: |
           mkdir -p android/app/src/main/assets
-          export EXPO_ROUTER_APP_ROOT="$(pwd)/app"
-          echo "EXPO_ROUTER_APP_ROOT=$EXPO_ROUTER_APP_ROOT"
           npx expo export:embed --platform android --entry-file node_modules/expo-router/entry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --dev false
           ls -lh android/app/src/main/assets/index.android.bundle
           echo "Bundle created"
