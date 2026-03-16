@@ -35,17 +35,6 @@ jobs:
       - name: Pin Gradle to 7.6.3
         run: printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > android/gradle/wrapper/gradle-wrapper.properties && cat android/gradle/wrapper/gradle-wrapper.properties
 
-      - name: Bundle JavaScript
-        run: |
-          mkdir -p android/app/src/main/assets
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
-          echo "Bundle size: $(du -sh android/app/src/main/assets/index.android.bundle)"
-
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
