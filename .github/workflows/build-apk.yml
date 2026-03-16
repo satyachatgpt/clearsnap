@@ -32,11 +32,9 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform android --clean
 
-      - name: Pin Gradle to 7.6.3 using Python
+      - name: Pin Gradle to 7.6.3
         run: |
           python3 - << 'PYEOF'
-          import os
-
           content = (
               "distributionBase=GRADLE_USER_HOME\n"
               "distributionPath=wrapper/dists\n"
@@ -44,30 +42,28 @@ jobs:
               "zipStoreBase=GRADLE_USER_HOME\n"
               "zipStorePath=wrapper/dists\n"
           )
-
           path = "android/gradle/wrapper/gradle-wrapper.properties"
-          os.makedirs(os.path.dirname(path), exist_ok=True)
           with open(path, "w", newline="\n") as f:
               f.write(content)
-
-          # Read back and verify
           with open(path, "r") as f:
               written = f.read()
-
-          print("=== gradle-wrapper.properties ===")
-          print(repr(written))
+          assert "gradle-7.6.3" in written
+          print("Gradle pinned to 7.6.3 ✓")
           print(written)
-
-          assert "gradle-7.6.3" in written, "FAILED: gradle-7.6.3 not found in file"
-          assert not any(line[0] == ' ' for line in written.splitlines() if line), "FAILED: leading spaces found"
-          print("Verification passed ✓")
           PYEOF
 
-      - name: Verify Gradle version
-        working-directory: android
+      - name: Bundle JavaScript into APK assets
         run: |
-          chmod +x gradlew
-          ./gradlew --version
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file node_modules/expo-router/entry.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
 
       - name: Build debug APK
         working-directory: android
