@@ -33,13 +33,7 @@ jobs:
         run: npx expo prebuild --platform android --clean
 
       - name: Pin Gradle to 7.6.3
-        run: python3 -c "
-          content = 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n';
-          open('android/gradle/wrapper/gradle-wrapper.properties', 'w').write(content);
-          print(open('android/gradle/wrapper/gradle-wrapper.properties').read());
-          assert 'gradle-7.6.3' in content;
-          print('Gradle pinned to 7.6.3 OK')
-          "
+        run: printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > android/gradle/wrapper/gradle-wrapper.properties && cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Bundle JavaScript into APK
         run: |
