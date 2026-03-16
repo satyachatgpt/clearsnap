@@ -52,26 +52,37 @@ jobs:
           print(written)
           PYEOF
 
-      - name: Bundle JavaScript into APK assets
+      - name: Bundle JavaScript into APK
         run: |
           mkdir -p android/app/src/main/assets
-          npx react-native bundle \
+
+          ENTRY="node_modules/expo-router/entry.js"
+          if [ ! -f "$ENTRY" ]; then
+            ENTRY="index.js"
+            echo "import 'expo-router/entry';" > index.js
+          fi
+          echo "Using entry: $ENTRY"
+
+          npx expo export:embed \
             --platform android \
-            --dev false \
-            --entry-file node_modules/expo-router/entry.js \
+            --entry-file "$ENTRY" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
+            --assets-dest android/app/src/main/res \
+            --dev false
+
+          ls -lh android/app/src/main/assets/index.android.bundle
+          echo "Bundle created ✓"
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: ClearSnap-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           retention-days: 30
