@@ -55,8 +55,10 @@ jobs:
       - name: Bundle JavaScript into APK
         run: |
           mkdir -p android/app/src/main/assets
+          export EXPO_ROUTER_APP_ROOT="$(pwd)/app"
+          echo "EXPO_ROUTER_APP_ROOT=$EXPO_ROUTER_APP_ROOT"
 
-          EXPO_ROUTER_APP_ROOT="app" npx expo export:embed \
+          npx expo export:embed \
             --platform android \
             --entry-file node_modules/expo-router/entry.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
@@ -79,3 +81,7 @@ jobs:
           name: ClearSnap-APK
           path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           retention-days: 30
+
+The only change from before is line:
+```
+EXPO_ROUTER_APP_ROOT="app"  →  export EXPO_ROUTER_APP_ROOT="$(pwd)/app"
