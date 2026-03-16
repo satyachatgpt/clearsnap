@@ -56,16 +56,9 @@ jobs:
         run: |
           mkdir -p android/app/src/main/assets
 
-          ENTRY="node_modules/expo-router/entry.js"
-          if [ ! -f "$ENTRY" ]; then
-            ENTRY="index.js"
-            echo "import 'expo-router/entry';" > index.js
-          fi
-          echo "Using entry: $ENTRY"
-
-          npx expo export:embed \
+          EXPO_ROUTER_APP_ROOT="app" npx expo export:embed \
             --platform android \
-            --entry-file "$ENTRY" \
+            --entry-file node_modules/expo-router/entry.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res \
             --dev false
