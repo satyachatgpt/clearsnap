@@ -29,30 +29,99 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Generate native Android project
+      - name: Expo prebuild
         run: npx expo prebuild --platform android --clean
 
-      - name: Force Gradle 7.6 + AGP 7.4 (fixes expo-module-gradle-plugin on CI)
+      - name: Pin Gradle to 7.6.3 and AGP to 7.4.2
         run: |
-          # Pin Gradle wrapper to 7.6.3 — proven stable with Expo 50 on CI
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'PROPS'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          PROPS
+          python3 - << 'PYEOF'
+          import re, os
 
-          # Pin Android Gradle Plugin to 7.4.2 (compatible with Gradle 7.6)
-          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:7.4.2/' android/build.gradle
+          # --- 1. gradle-wrapper.properties (no leading spaces) ---
+          props = "\n".join([
+            "distributionBase=GRADLE_USER_HOME",
+            "distributionPath=wrapper/dists",
+            r"distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip",
+            "zipStoreBase=GRADLE_USER_HOME",
+            "zipStorePath=wrapper/dists",
+            ""
+          ])
+          with open("android/gradle/wrapper/gradle-wrapper.properties", "w") as f:
+            f.write(props)
+          print("Wrote gradle-wrapper.properties:")
+          print(props)
 
-          # Pin Kotlin to 1.8.x if present
-          sed -i 's/org.jetbrains.kotlin:kotlin-gradle-plugin:[0-9.]*/org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.10/' android/build.gradle
+          # --- 2. android/build.gradle - pin AGP and Kotlin ---
+          with open("android/build.gradle", "r") as f:
+            content = f.read()
 
-          echo "--- android/gradle/wrapper/gradle-wrapper.properties ---"
-          cat android/gradle/wrapper/gradle-wrapper.properties
-          echo "--- android/build.gradle ---"
-          cat android/build.gradle
+          content = re.sub(
+            r"com\.android\.tools\.build:gradle:[^\s'\"]+",
+            "com.android.tools.build:gradle:7.4.2",
+            content
+          )
+          content = re.sub(
+            r"org\.jetbrains\.kotlin:kotlin-gradle-plugin:[^\s'\"]+",
+            "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.10",
+            content
+          )
+
+          with open("android/build.gradle", "w") as f:
+            f.write(content)
+          print("android/build.gradle after patch:")
+          print(content)
+
+          # --- 3. settings.gradle - ensure includeBuild uses absolute path ---
+          with open("android/settings.gradle", "r") as f:
+            settings = f.read()
+          print("android/settings.gradle (original):")
+          print(settings)
+
+          # Replace relative includeBuild path with absolute
+          import subprocess
+          expo_dir = subprocess.check_output(
+            ["node", "-e", "console.log(require('path').dirname(require.resolve('expo/package.json')))"],
+            text=True
+          ).strip()
+          print(f"expo package dir: {expo_dir}")
+
+          # Ensure node_modules/expo has a settings.gradle (required by Gradle 8 for includeBuild)
+          expo_settings = os.path.join(expo_dir, "settings.gradle")
+          if not os.path.exists(expo_settings):
+            with open(expo_settings, "w") as f:
+              f.write('rootProject.name = "expo"\n')
+            print(f"Created {expo_settings}")
+          else:
+            with open(expo_settings, "r") as f:
+              print(f"Existing {expo_settings}:", f.read())
+
+          # Also ensure expo-modules-core has one
+          emc_dir = subprocess.check_output(
+            ["node", "-e", "console.log(require('path').dirname(require.resolve('expo-modules-core/package.json')))"],
+            text=True
+          ).strip()
+          emc_settings = os.path.join(emc_dir, "settings.gradle")
+          if not os.path.exists(emc_settings):
+            with open(emc_settings, "w") as f:
+              f.write('rootProject.name = "expo-modules-core"\n')
+            print(f"Created {emc_settings}")
+          else:
+            with open(emc_settings, "r") as f:
+              print(f"Existing {emc_settings}:", f.read())
+
+          # Replace ../node_modules/expo relative path with absolute
+          new_settings = re.sub(
+            r"includeBuild\s*['\"]\.\.\/node_modules\/expo['\"]",
+            f"includeBuild('{expo_dir}')",
+            settings
+          )
+          if new_settings != settings:
+            with open("android/settings.gradle", "w") as f:
+              f.write(new_settings)
+            print("android/settings.gradle (fixed):")
+            print(new_settings)
+
+          PYEOF
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
