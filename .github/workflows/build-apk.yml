@@ -32,33 +32,34 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean
 
-      - name: Fix Expo Gradle plugin path in settings.gradle
+      - name: Force Gradle 7.6 + AGP 7.4 (fixes expo-module-gradle-plugin on CI)
         run: |
-          node -e "
-            const fs = require('fs');
-            const path = require('path');
-            const expoPath = path.dirname(require.resolve('expo/package.json'));
-            const settingsFile = 'android/settings.gradle';
-            let content = fs.readFileSync(settingsFile, 'utf8');
-            console.log('--- Current settings.gradle ---');
-            console.log(content);
-            if (!content.includes('includeBuild')) {
-              const patch = 'pluginManagement { includeBuild(\"' + expoPath + '\") }\n';
-              content = patch + content;
-              fs.writeFileSync(settingsFile, content);
-              console.log('--- Patched settings.gradle ---');
-              console.log(content);
-            } else {
-              console.log('includeBuild already present — no patch needed');
-            }
-          "
+          # Pin Gradle wrapper to 7.6.3 — proven stable with Expo 50 on CI
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'PROPS'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          PROPS
+
+          # Pin Android Gradle Plugin to 7.4.2 (compatible with Gradle 7.6)
+          sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:7.4.2/' android/build.gradle
+
+          # Pin Kotlin to 1.8.x if present
+          sed -i 's/org.jetbrains.kotlin:kotlin-gradle-plugin:[0-9.]*/org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.10/' android/build.gradle
+
+          echo "--- android/gradle/wrapper/gradle-wrapper.properties ---"
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          echo "--- android/build.gradle ---"
+          cat android/build.gradle
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
