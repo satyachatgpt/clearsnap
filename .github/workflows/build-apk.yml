@@ -32,32 +32,58 @@ jobs:
       - name: Expo prebuild
         run: npx expo prebuild --platform android --clean
 
-      - name: Fix android/build.gradle
+      - name: Pin Gradle to 7.6.3
         run: |
-          python3 - << 'PYEOF'
-          import re
+          PROPS="android/gradle/wrapper/gradle-wrapper.properties"
+          printf '%s\n' \
+            'distributionBase=GRADLE_USER_HOME' \
+            'distributionPath=wrapper/dists' \
+            'distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip' \
+            'zipStoreBase=GRADLE_USER_HOME' \
+            'zipStorePath=wrapper/dists' \
+            > "$PROPS"
+          echo "--- gradle-wrapper.properties ---"
+          cat "$PROPS"
 
-          path = "android/build.gradle"
-          with open(path, "r") as f:
-              content = f.read()
+      - name: Pin AGP to 7.4.2 and fix compatibility conflicts
+        run: |
+          node -e "
+            const fs = require('fs');
+            let src = fs.readFileSync('android/build.gradle', 'utf8');
+            console.log('--- ORIGINAL build.gradle ---');
+            console.log(src);
 
-          print("=== BEFORE ===")
-          print(content)
+            // Pin AGP
+            src = src.replace(/com\.android\.tools\.build:gradle:[^\s'\"]+/g, 'com.android.tools.build:gradle:7.4.2');
+            // Pin Kotlin
+            src = src.replace(/org\.jetbrains\.kotlin:kotlin-gradle-plugin:[^\s'\"]+/g, 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.10');
+            // Remove java toolchain block
+            src = src.replace(/\s*java\s*\{[^}]*toolchain\s*\{[^}]*\}[^}]*\}/gs, '');
+            // Remove sourceCompatibility and targetCompatibility (with or without = sign)
+            src = src.replace(/[ \t]*sourceCompatibility[^\n]+\n/g, '');
+            src = src.replace(/[ \t]*targetCompatibility[^\n]+\n/g, '');
 
-          # Remove sourceCompatibility and targetCompatibility lines — they conflict
-          # with the Java toolchain block that expo prebuild also generates
-          content = re.sub(r'[ \t]*sourceCompatibility\s*=\s*JavaVersion\.[^\n]+\n', '', content)
-          content = re.sub(r'[ \t]*targetCompatibility\s*=\s*JavaVersion\.[^\n]+\n', '', content)
+            fs.writeFileSync('android/build.gradle', src);
+            console.log('--- PATCHED build.gradle ---');
+            console.log(src);
 
-          with open(path, "w") as f:
-              f.write(content)
+            // Hard verify
+            if (src.includes('toolchain')) throw new Error('toolchain still present');
+            if (src.includes('sourceCompatibility')) throw new Error('sourceCompatibility still present');
+            if (src.includes('targetCompatibility')) throw new Error('targetCompatibility still present');
+            if (!src.includes('7.4.2')) throw new Error('AGP 7.4.2 not found');
+            console.log('Verification passed');
+          "
 
-          print("=== AFTER ===")
-          print(content)
-          PYEOF
+      - name: Print settings.gradle
+        run: cat android/settings.gradle
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
+
+      - name: Confirm Gradle version is 7.6.3
+        working-directory: android
+        run: ./gradlew --version
 
       - name: Build debug APK
         working-directory: android
