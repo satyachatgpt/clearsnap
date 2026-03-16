@@ -33,40 +33,22 @@ jobs:
         run: npx expo prebuild --platform android --clean
 
       - name: Pin Gradle to 7.6.3
-        run: |
-          python3 - << 'PYEOF'
-          content = (
-              "distributionBase=GRADLE_USER_HOME\n"
-              "distributionPath=wrapper/dists\n"
-              r"distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip" + "\n"
-              "zipStoreBase=GRADLE_USER_HOME\n"
-              "zipStorePath=wrapper/dists\n"
-          )
-          path = "android/gradle/wrapper/gradle-wrapper.properties"
-          with open(path, "w", newline="\n") as f:
-              f.write(content)
-          with open(path, "r") as f:
-              written = f.read()
-          assert "gradle-7.6.3" in written
-          print("Gradle pinned to 7.6.3 ✓")
-          print(written)
-          PYEOF
+        run: python3 -c "
+          content = 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n';
+          open('android/gradle/wrapper/gradle-wrapper.properties', 'w').write(content);
+          print(open('android/gradle/wrapper/gradle-wrapper.properties').read());
+          assert 'gradle-7.6.3' in content;
+          print('Gradle pinned to 7.6.3 OK')
+          "
 
       - name: Bundle JavaScript into APK
         run: |
           mkdir -p android/app/src/main/assets
           export EXPO_ROUTER_APP_ROOT="$(pwd)/app"
           echo "EXPO_ROUTER_APP_ROOT=$EXPO_ROUTER_APP_ROOT"
-
-          npx expo export:embed \
-            --platform android \
-            --entry-file node_modules/expo-router/entry.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res \
-            --dev false
-
+          npx expo export:embed --platform android --entry-file node_modules/expo-router/entry.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --dev false
           ls -lh android/app/src/main/assets/index.android.bundle
-          echo "Bundle created ✓"
+          echo "Bundle created"
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
@@ -81,7 +63,3 @@ jobs:
           name: ClearSnap-APK
           path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           retention-days: 30
-
-The only change from before is line:
-```
-EXPO_ROUTER_APP_ROOT="app"  →  export EXPO_ROUTER_APP_ROOT="$(pwd)/app"
